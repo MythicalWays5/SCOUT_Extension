@@ -13,10 +13,10 @@ async function checkForUpdates() {
         
         const config = await res.json();
         const currentVersion = chrome.runtime.getManifest().version;
-        
-        if (config.latestVersion && config.latestVersion !== currentVersion) {
+        const remoteVer = parseFloat(config.latestVersion);
+        const localVer = parseFloat(currentVersion);
+        if (remoteVer > localVer) {
             chrome.storage.local.set({ updateAvailable: true });
-            
             chrome.notifications.create("scout-update", {
                 type: "basic",
                 iconUrl: "scout_logo.png",
@@ -38,12 +38,11 @@ setInterval(checkForUpdates, 12 * 60 * 60 * 1000);
 // ---------------- GROUP LIST LOADER ----------------
 async function getFlaggedGroups() {
     if (cachedFlaggedGroups) return cachedFlaggedGroups;
-
-    const res = await fetch(MASTER_LIST_URL);
+    const cacheBusterUrl = `${MASTER_LIST_URL}?t=${Date.now()}`;
+    const res = await fetch(cacheBusterUrl);
     if (!res.ok) throw new Error("Failed to fetch list from GitHub");
     
     const text = await res.text();
-
     cachedFlaggedGroups = new Set(
         text.split(",")
             .map(x => x.trim())
