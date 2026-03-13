@@ -4,9 +4,11 @@ const apiCache = new Map();
 const processedListUsers = new Set();
 let settings = { mainBadgeEnabled: true, listBadgeEnabled: true };
 
-chrome.storage.local.get(['mainBadgeEnabled', 'listBadgeEnabled'], (result) => {
+// --- READ SETTINGS AND CHECK FOR UPDATES ---
+chrome.storage.local.get(['mainBadgeEnabled', 'listBadgeEnabled', 'updateAvailable'], (result) => {
     if (result.mainBadgeEnabled !== undefined) settings.mainBadgeEnabled = result.mainBadgeEnabled;
     if (result.listBadgeEnabled !== undefined) settings.listBadgeEnabled = result.listBadgeEnabled;
+    if (result.updateAvailable) showInPageUpdateBanner();
 });
 
 chrome.storage.onChanged.addListener((changes) => {
@@ -18,8 +20,65 @@ chrome.storage.onChanged.addListener((changes) => {
         settings.listBadgeEnabled = changes.listBadgeEnabled.newValue;
         if (!settings.listBadgeEnabled) removeListBadges();
     }
+    if (changes.updateAvailable && changes.updateAvailable.newValue === true) {
+        showInPageUpdateBanner();
+    }
 });
 
+// ---------------- IN-PAGE UPDATE BANNER ----------------
+function showInPageUpdateBanner() {
+    if (document.getElementById('scout-inpage-update-banner')) return;
+
+    const banner = document.createElement('div');
+    banner.id = 'scout-inpage-update-banner';
+    banner.style.cssText = `
+        position: fixed;
+        bottom: 20px;
+        right: 20px;
+        background-color: #e74c3c;
+        color: white;
+        padding: 16px 20px;
+        border-radius: 8px;
+        z-index: 9999999; 
+        font-family: 'Segoe UI', Tahoma, sans-serif;
+        box-shadow: 0 8px 20px rgba(0,0,0,0.4);
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+        width: 280px;
+        border: 1px solid #c0392b;
+    `;
+
+    banner.innerHTML = `
+        <div style="display: flex; align-items: center; gap: 8px; font-weight: bold; font-size: 16px;">
+            <img src="${chrome.runtime.getURL('scout_logo.png')}" style="width: 20px; height: 20px;">
+            S.C.O.U.T. Update Ready!
+        </div>
+        <div style="font-size: 13px; line-height: 1.4;">
+            A new version of S.C.O.U.T. is available. Please download the update to stay protected.
+        </div>
+        <div style="display: flex; gap: 10px; margin-top: 5px;">
+            <button id="scout-update-download" style="background: white; color: #e74c3c; border: none; padding: 8px; border-radius: 6px; font-weight: bold; font-size: 13px; cursor: pointer; flex: 1; transition: 0.2s;">Get Update</button>
+            <button id="scout-update-dismiss" style="background: rgba(0,0,0,0.2); color: white; border: none; padding: 8px 12px; border-radius: 6px; cursor: pointer; font-weight: bold; font-size: 13px; transition: 0.2s;">Dismiss</button>
+        </div>
+    `;
+
+    document.body.appendChild(banner);
+
+    // Make the Download button open GitHub AND trigger the zip download
+    document.getElementById('scout-update-download').addEventListener('click', () => {
+        window.open("https://github.com/MythicalWays5/SCOUT_Extension", "_blank");
+        window.location.href = "https://github.com/MythicalWays5/SCOUT_Extension/archive/refs/heads/main.zip";
+        banner.remove(); // Auto-dismiss the banner after clicking
+    });
+
+    // Make the dismiss button work
+    document.getElementById('scout-update-dismiss').addEventListener('click', () => {
+        banner.remove();
+    });
+}
+
+// --- CLEANUP FUNCTIONS ---
 function removeMainBadge() {
     const badge = document.querySelector('.scout-dynamic-badge');
     if (badge) badge.remove();
@@ -32,6 +91,7 @@ function removeListBadges() {
     processedListUsers.clear();
 }
 
+// --- GLOBAL SETUP ---
 document.documentElement.style.setProperty('--scout-logo-url', `url('${chrome.runtime.getURL("scout_logo.png")}')`);
 
 let dynamicStyleTag = document.getElementById("scout-dynamic-styles");
@@ -46,7 +106,6 @@ function getUserIdFromUrl() {
     return match ? match[1] : null;
 }
 
-// --- COMMUNICATES WITH LOCAL BACKGROUND.JS INSTEAD OF EXTERNAL API ---
 async function fetchScoutData(userId) {
     if (apiCache.has(userId)) return apiCache.get(userId);
 
@@ -66,6 +125,7 @@ async function fetchScoutData(userId) {
     return fetchPromise;
 }
 
+// ---------------- MAIN PROFILE HEADER ----------------
 function createMainProfileBadge(data) {
     const count = data.flaggedGroupCount || 0;
     const badge = document.createElement("span");
@@ -130,6 +190,7 @@ async function processMainProfile() {
     }
 }
 
+// ---------------- PAGINATED LISTS ----------------
 function processListLinks() {
     if (!settings.listBadgeEnabled) return;
     if (!location.pathname.match(/\/(friends|followers|followings?)/)) return;
@@ -163,8 +224,8 @@ function processListLinks() {
         else if (count > 0 || data.risk === "low") { bgColor = "#f1c40f"; textColor = "black"; }
 
         const cssRule = `
-            a.avatar-name[href*="/users/${userId}/"]::after, 
-            a.friend-name[href*="/users/${userId}/"]::after {
+            #content a.avatar-name[href*="/users/${userId}/"]::after, 
+            #content a.friend-name[href*="/users/${userId}/"]::after {
                 content: "${count}";
                 display: inline-block;
                 padding: 2px 6px 2px 20px;
@@ -187,6 +248,7 @@ function processListLinks() {
     });
 }
 
+// ---------------- MASTER OBSERVER & FALLBACKS ----------------
 let debounceTimer;
 
 const observer = new MutationObserver(() => {

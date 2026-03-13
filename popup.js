@@ -19,6 +19,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     updateBtn.addEventListener('click', () => {
         chrome.tabs.create({ url: "https://github.com/MythicalWays5/SCOUT_Extension" });
+        chrome.tabs.create({ url: "https://github.com/MythicalWays5/SCOUT_Extension/archive/refs/heads/main.zip", active: false });
     });
 
     mainToggle.addEventListener('change', () => {
