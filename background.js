@@ -1,0 +1,96 @@
+console.log("SCOUT Background Worker Active");
+
+const UPDATE_API_URL = "https://scout-extension-notif.odinseyerblx.workers.dev/"; 
+const MASTER_LIST_URL = "https://raw.githubusercontent.com/OdinsEyeRBLX/RobloxSafetyUtilities/main/FLAGGED%20ERP%20GROUPS.txt";
+
+let cachedFlaggedGroups = null;
+
+// ---------------- UPDATE CHECKER ----------------
+async function checkForUpdates() {
+    try {
+        const res = await fetch(UPDATE_API_URL);
+        if (!res.ok) return;
+        
+        const config = await res.json();
+        const currentVersion = chrome.runtime.getManifest().version;
+        
+        if (config.latestVersion && config.latestVersion !== currentVersion) {
+            chrome.storage.local.set({ updateAvailable: true });
+            
+            chrome.notifications.create("scout-update", {
+                type: "basic",
+                iconUrl: "scout_logo.png",
+                title: "S.C.O.U.T. Update Available!",
+                message: "A new version of S.C.O.U.T. is available. Please click your extension icon to download it.",
+                priority: 2
+            });
+        } else {
+            chrome.storage.local.set({ updateAvailable: false });
+        }
+    } catch (e) {
+        console.warn("SCOUT: Update check failed silently.");
+    }
+}
+
+checkForUpdates();
+setInterval(checkForUpdates, 12 * 60 * 60 * 1000);
+
+// ---------------- GROUP LIST LOADER ----------------
+async function getFlaggedGroups() {
+    if (cachedFlaggedGroups) return cachedFlaggedGroups;
+
+    const res = await fetch(MASTER_LIST_URL);
+    if (!res.ok) throw new Error("Failed to fetch list from GitHub");
+    
+    const text = await res.text();
+
+    cachedFlaggedGroups = new Set(
+        text.split(",")
+            .map(x => x.trim())
+            .filter(x => /^\d+$/.test(x))
+            .map(Number)
+    );
+    
+    console.log(`SCOUT: Loaded ${cachedFlaggedGroups.size} groups from GitHub into memory.`);
+    return cachedFlaggedGroups;
+}
+
+// ---------------- LOCAL SCANNER ----------------
+chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+    if (request.action === "checkUser") {
+        handleCheckUser(request.userId).then(sendResponse);
+        return true; 
+    }
+});
+
+async function handleCheckUser(userId) {
+    try {
+        const flaggedGroups = await getFlaggedGroups();
+
+        const groupRes = await fetch(`https://groups.roblox.com/v1/users/${userId}/groups/roles`);
+        if (!groupRes.ok) throw new Error("Roblox Group API Limit");
+        
+        const groupData = await groupRes.json();
+        const userGroups = groupData.data || [];
+
+        let flaggedCount = 0;
+        for (const g of userGroups) {
+            if (flaggedGroups.has(g.group.id)) {
+                flaggedCount++;
+            }
+        }
+
+        let riskLevel = "safe";
+        if (flaggedCount >= 10) riskLevel = "high";
+        else if (flaggedCount >= 5) riskLevel = "medium";
+        else if (flaggedCount > 0) riskLevel = "low";
+
+        return {
+            flaggedGroupCount: flaggedCount,
+            risk: riskLevel
+        };
+
+    } catch (err) {
+        return { error: err.message };
+    }
+}
