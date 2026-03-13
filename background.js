@@ -7,16 +7,27 @@ let cachedFlaggedGroups = null;
 
 // ---------------- UPDATE CHECKER ----------------
 async function checkForUpdates() {
+    const data = await chrome.storage.local.get(['lastUpdateCheck']);
+    const now = Date.now();
+    const TWELVE_HOURS = 12 * 60 * 60 * 1000;
+
+    if (data.lastUpdateCheck && (now - data.lastUpdateCheck < TWELVE_HOURS)) {
+        return; 
+    }
+
     try {
         const res = await fetch(UPDATE_API_URL);
         if (!res.ok) return;
         
         const config = await res.json();
         const currentVersion = chrome.runtime.getManifest().version;
+        
         const remoteVer = parseFloat(config.latestVersion);
         const localVer = parseFloat(currentVersion);
+        
         if (remoteVer > localVer) {
             chrome.storage.local.set({ updateAvailable: true });
+            
             chrome.notifications.create("scout-update", {
                 type: "basic",
                 iconUrl: "scout_logo.png",
@@ -27,6 +38,8 @@ async function checkForUpdates() {
         } else {
             chrome.storage.local.set({ updateAvailable: false });
         }
+        chrome.storage.local.set({ lastUpdateCheck: now });
+
     } catch (e) {
         console.warn("SCOUT: Update check failed silently.");
     }
