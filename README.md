@@ -32,7 +32,7 @@ Because S.C.O.U.T. is not currently on the Chrome Web Store, you will need to in
 2. **Extract the Folder:** Find the downloaded `.zip` file on your computer, right-click it, and select **Extract All**. Remember where you saved this extracted folder.
 3. **Open Extension Settings:** Open Chrome and type `chrome://extensions/` into your URL bar and hit Enter.
 4. **Enable Developer Mode:** In the top-right corner of the Extensions page, toggle **Developer mode** to ON.
-5. **Load the Extension:** Click the **Load unpacked** button in the top-left corner. Select the extracted `SCOUT_Extension-main` folder. 
+5. **Load the Extension:** Click the **Load unpacked** button in the top-left corner. Select the extracted `SCOUT_Extension-main` folder. (**Alternatively**, you can just drag and drop the `.zip` file in your extension page!)
 6. **Done!** You should now see the S.C.O.U.T. logo in your extensions list. Refresh any open Roblox tabs to start using it.
 
 ---
