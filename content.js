@@ -2,12 +2,13 @@ console.log("SCOUT extension active (RoPro Compatible Mode)");
 
 const apiCache = new Map();
 const processedListUsers = new Set();
-let settings = { mainBadgeEnabled: true, listBadgeEnabled: true };
+let settings = { mainBadgeEnabled: true, listBadgeEnabled: true, termBadgeEnabled: true };
 
 // --- READ SETTINGS AND CHECK FOR UPDATES ---
-chrome.storage.local.get(['mainBadgeEnabled', 'listBadgeEnabled', 'updateAvailable'], (result) => {
+chrome.storage.local.get(['mainBadgeEnabled', 'listBadgeEnabled', 'termBadgeEnabled', 'updateAvailable'], (result) => {
     if (result.mainBadgeEnabled !== undefined) settings.mainBadgeEnabled = result.mainBadgeEnabled;
     if (result.listBadgeEnabled !== undefined) settings.listBadgeEnabled = result.listBadgeEnabled;
+    if (result.termBadgeEnabled !== undefined) settings.termBadgeEnabled = result.termBadgeEnabled;
     if (result.updateAvailable) showInPageUpdateBanner();
 });
 
@@ -19,6 +20,10 @@ chrome.storage.onChanged.addListener((changes) => {
     if (changes.listBadgeEnabled) {
         settings.listBadgeEnabled = changes.listBadgeEnabled.newValue;
         if (!settings.listBadgeEnabled) removeListBadges();
+    }
+    if (changes.termBadgeEnabled) {
+        settings.termBadgeEnabled = changes.termBadgeEnabled.newValue;
+        if (!settings.termBadgeEnabled) removeTermBadge();
     }
     if (changes.updateAvailable && changes.updateAvailable.newValue === true) {
         showInPageUpdateBanner();
@@ -91,6 +96,11 @@ function removeListBadges() {
     processedListUsers.clear();
 }
 
+function removeTermBadge() {
+    const badge = document.getElementById("scout-term-badge");
+    if (badge) badge.remove();
+}
+
 // --- GLOBAL SETUP ---
 document.documentElement.style.setProperty('--scout-logo-url', `url('${chrome.runtime.getURL("scout_logo.png")}')`);
 
@@ -157,11 +167,15 @@ function createMainProfileBadge(data) {
 }
 
 async function processMainProfile() {
-    if (!settings.mainBadgeEnabled) return;
     if (!location.pathname.includes('/profile')) return;
 
     const userId = getUserIdFromUrl();
     if (!userId) return;
+    
+    // Trigger Terminated Friends Scan independently of the main badge
+    processTerminatedFriendsBadge(userId);
+
+    if (!settings.mainBadgeEnabled) return;
 
     const usernameEl = document.getElementById("profile-header-title-container-name");
     if (!usernameEl) return;
@@ -188,6 +202,50 @@ async function processMainProfile() {
         usernameEl.parentElement.style.display = "flex";
         usernameEl.parentElement.style.alignItems = "center";
     }
+}
+
+// ---------------- TERMINATED FRIENDS UI ----------------
+function processTerminatedFriendsBadge(userId) {
+    if (!settings.termBadgeEnabled) return;
+    const connectionsBtn = document.querySelector(`a[href*="/users/${userId}/friends"]`);
+    if (!connectionsBtn) return;
+    if (document.getElementById("scout-term-badge")) return;
+    const badge = document.createElement("div");
+    badge.id = "scout-term-badge";
+    badge.style.cssText = `
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        margin-left: 8px;
+        padding: 0 12px;
+        height: 32px; 
+        font-size: 14px;
+        font-weight: 600;
+        border-radius: 100px; 
+        background-color: rgba(231, 76, 60, 0.1);
+        color: #e74c3c;
+        border: 1px solid rgba(231, 76, 60, 0.3);
+        white-space: nowrap;
+        font-family: 'Builder Sans', 'Segoe UI', Tahoma, sans-serif;
+    `;
+    badge.textContent = "Scanning...";
+    connectionsBtn.insertAdjacentElement('afterend', badge);
+    chrome.runtime.sendMessage({ action: "checkTerminatedFriends", userId: userId }, (response) => {
+        if (chrome.runtime.lastError || !response || response.error) {
+            badge.remove(); // Silently fail and remove badge if API errors
+            return;
+        }
+        if (response.terminatedCount > 0) {
+            badge.textContent = `${response.terminatedCount} Terminated`;
+            badge.style.backgroundColor = "rgba(231, 76, 60, 0.15)";
+            badge.style.border = "1px solid #e74c3c";
+        } else {
+            badge.textContent = "0 Terminated";
+            badge.style.color = "#2ecc71"; // Safe Green
+            badge.style.backgroundColor = "rgba(46, 204, 113, 0.1)";
+            badge.style.border = "1px solid rgba(46, 204, 113, 0.3)";
+        }
+    });
 }
 
 // ---------------- PAGINATED LISTS ----------------

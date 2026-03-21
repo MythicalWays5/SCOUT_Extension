@@ -73,6 +73,10 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         handleCheckUser(request.userId).then(sendResponse);
         return true; 
     }
+    if (request.action === "checkTerminatedFriends") {
+        handleTerminatedFriends(request.userId).then(sendResponse);
+        return true;
+    }
 });
 
 async function handleCheckUser(userId) {
@@ -103,6 +107,42 @@ async function handleCheckUser(userId) {
         };
 
     } catch (err) {
+        return { error: err.message };
+    }
+}
+// ---------------- TERMINATED FRIENDS SCANNER ----------------
+async function handleTerminatedFriends(userId) {
+    try {
+        const friendsRes = await fetch(`https://friends.roblox.com/v1/users/${userId}/friends`);
+        if (!friendsRes.ok) throw new Error("Roblox API Limit");
+        
+        const friendsData = await friendsRes.json();
+        const friends = friendsData.data || [];
+
+        if (friends.length === 0) return { terminatedCount: 0 };
+
+        let terminatedCount = 0;
+        const chunkSize = 10;
+        for (let i = 0; i < friends.length; i += chunkSize) {
+            const chunk = friends.slice(i, i + chunkSize);
+            await Promise.all(chunk.map(async (friend) => {
+                try {
+                    const userRes = await fetch(`https://users.roblox.com/v1/users/${friend.id}`);
+                    if (!userRes.ok) return;
+                    
+                    const userData = await userRes.json();
+                    if (userData.isBanned) {
+                        terminatedCount++;
+                    }
+                } catch (e) {
+                }
+            }));
+            await new Promise(resolve => setTimeout(resolve, 150));  //simple wait time for rate limits
+        }
+
+        return { terminatedCount };
+    } catch (err) {
+        console.error("SCOUT Terminated Friends Error:", err);
         return { error: err.message };
     }
 }
