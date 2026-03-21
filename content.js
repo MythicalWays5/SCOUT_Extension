@@ -1,6 +1,7 @@
 console.log("SCOUT extension active (RoPro Compatible Mode)");
 
 const apiCache = new Map();
+const termCache = new Map(); // New cache for terminated friends
 const processedListUsers = new Set();
 let settings = { mainBadgeEnabled: true, listBadgeEnabled: true, termBadgeEnabled: true };
 
@@ -116,6 +117,7 @@ function getUserIdFromUrl() {
     return match ? match[1] : null;
 }
 
+// Fetcher for Main Profile/List Groups
 async function fetchScoutData(userId) {
     if (apiCache.has(userId)) return apiCache.get(userId);
 
@@ -132,6 +134,25 @@ async function fetchScoutData(userId) {
     });
 
     apiCache.set(userId, fetchPromise);
+    return fetchPromise;
+}
+
+// Fetcher for Terminated Friends
+async function fetchTerminatedData(userId) {
+    if (termCache.has(userId)) return termCache.get(userId);
+
+    const fetchPromise = new Promise((resolve) => {
+        chrome.runtime.sendMessage({ action: "checkTerminatedFriends", userId: userId }, (response) => {
+            if (chrome.runtime.lastError || !response || response.error) {
+                termCache.delete(userId); // Clear on fail so it can retry later
+                resolve(null);
+            } else {
+                resolve(response);
+            }
+        });
+    });
+
+    termCache.set(userId, fetchPromise);
     return fetchPromise;
 }
 
@@ -205,18 +226,26 @@ async function processMainProfile() {
 }
 
 // ---------------- TERMINATED FRIENDS UI ----------------
-function processTerminatedFriendsBadge(userId) {
+async function processTerminatedFriendsBadge(userId) {
     if (!settings.termBadgeEnabled) return;
+
+    // Target the specific "Connections" button
     const connectionsBtn = document.querySelector(`a[href*="/users/${userId}/friends"]`);
-    if (!connectionsBtn) return;
+    
+    // Safety check: Ensure the button AND its parent exist before injecting
+    if (!connectionsBtn || !connectionsBtn.parentElement) return;
+
+    // Prevent duplicate badges
     if (document.getElementById("scout-term-badge")) return;
+
+    // Create a modern pill badge
     const badge = document.createElement("div");
     badge.id = "scout-term-badge";
     badge.style.cssText = `
         display: inline-flex;
         align-items: center;
         justify-content: center;
-        margin-left: 8px;
+        margin-left: 12px;
         padding: 0 12px;
         height: 32px; 
         font-size: 14px;
@@ -229,23 +258,35 @@ function processTerminatedFriendsBadge(userId) {
         font-family: 'Builder Sans', 'Segoe UI', Tahoma, sans-serif;
     `;
     badge.textContent = "Scanning...";
-    connectionsBtn.insertAdjacentElement('afterend', badge);
-    chrome.runtime.sendMessage({ action: "checkTerminatedFriends", userId: userId }, (response) => {
-        if (chrome.runtime.lastError || !response || response.error) {
-            badge.remove(); // Silently fail and remove badge if API errors
-            return;
-        }
-        if (response.terminatedCount > 0) {
-            badge.textContent = `${response.terminatedCount} Terminated`;
-            badge.style.backgroundColor = "rgba(231, 76, 60, 0.15)";
-            badge.style.border = "1px solid #e74c3c";
-        } else {
-            badge.textContent = "0 Terminated";
-            badge.style.color = "#2ecc71"; // Safe Green
-            badge.style.backgroundColor = "rgba(46, 204, 113, 0.1)";
-            badge.style.border = "1px solid rgba(46, 204, 113, 0.3)";
-        }
-    });
+
+    // Append to the parent element instead of directly next to the <a> tag
+    // This stops React's flexbox hydration from panicking and deleting it
+    connectionsBtn.parentElement.appendChild(badge);
+
+    // Fetch using the new cached system
+    const response = await fetchTerminatedData(userId);
+
+    // Re-grab the badge from the DOM because React might have destroyed 
+    // the original while we were waiting for the background API!
+    const liveBadge = document.getElementById("scout-term-badge");
+    if (!liveBadge) return;
+
+    if (!response) {
+        liveBadge.remove();
+        return;
+    }
+
+    // Update the live badge with the final math
+    if (response.terminatedCount > 0) {
+        liveBadge.textContent = `${response.terminatedCount} Terminated`;
+        liveBadge.style.backgroundColor = "rgba(231, 76, 60, 0.15)";
+        liveBadge.style.border = "1px solid #e74c3c";
+    } else {
+        liveBadge.textContent = "0 Terminated";
+        liveBadge.style.color = "#2ecc71"; // Safe Green
+        liveBadge.style.backgroundColor = "rgba(46, 204, 113, 0.1)";
+        liveBadge.style.border = "1px solid rgba(46, 204, 113, 0.3)";
+    }
 }
 
 // ---------------- PAGINATED LISTS ----------------
