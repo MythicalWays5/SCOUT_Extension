@@ -1,15 +1,16 @@
-console.log("SCOUT extension active (RoPro Compatible Mode)");
+console.log("SCOUT extension active");
 
 const apiCache = new Map();
-const termCache = new Map(); // New cache for terminated friends
+const termCache = new Map(); 
 const processedListUsers = new Set();
-let settings = { mainBadgeEnabled: true, listBadgeEnabled: true, termBadgeEnabled: true };
+let settings = { mainBadgeEnabled: true, listBadgeEnabled: true, termBadgeEnabled: true, groupBadgeEnabled: true };
 
 // --- READ SETTINGS AND CHECK FOR UPDATES ---
-chrome.storage.local.get(['mainBadgeEnabled', 'listBadgeEnabled', 'termBadgeEnabled', 'updateAvailable'], (result) => {
+chrome.storage.local.get(['mainBadgeEnabled', 'listBadgeEnabled', 'termBadgeEnabled', 'groupBadgeEnabled', 'updateAvailable'], (result) => {
     if (result.mainBadgeEnabled !== undefined) settings.mainBadgeEnabled = result.mainBadgeEnabled;
     if (result.listBadgeEnabled !== undefined) settings.listBadgeEnabled = result.listBadgeEnabled;
     if (result.termBadgeEnabled !== undefined) settings.termBadgeEnabled = result.termBadgeEnabled;
+    if (result.groupBadgeEnabled !== undefined) settings.groupBadgeEnabled = result.groupBadgeEnabled;
     if (result.updateAvailable) showInPageUpdateBanner();
 });
 
@@ -25,6 +26,10 @@ chrome.storage.onChanged.addListener((changes) => {
     if (changes.termBadgeEnabled) {
         settings.termBadgeEnabled = changes.termBadgeEnabled.newValue;
         if (!settings.termBadgeEnabled) removeTermBadge();
+    }
+    if (changes.groupBadgeEnabled) {
+        settings.groupBadgeEnabled = changes.groupBadgeEnabled.newValue;
+        if (!settings.groupBadgeEnabled) removeGroupBadge();
     }
     if (changes.updateAvailable && changes.updateAvailable.newValue === true) {
         showInPageUpdateBanner();
@@ -71,14 +76,12 @@ function showInPageUpdateBanner() {
 
     document.body.appendChild(banner);
 
-    // Make the Download button open GitHub AND trigger the zip download
     document.getElementById('scout-update-download').addEventListener('click', () => {
         window.open("https://github.com/MythicalWays5/SCOUT_Extension", "_blank");
         window.location.href = "https://github.com/MythicalWays5/SCOUT_Extension/archive/refs/heads/main.zip";
-        banner.remove(); // Auto-dismiss the banner after clicking
+        banner.remove(); 
     });
 
-    // Make the dismiss button work
     document.getElementById('scout-update-dismiss').addEventListener('click', () => {
         banner.remove();
     });
@@ -102,6 +105,13 @@ function removeTermBadge() {
     if (badge) badge.remove();
 }
 
+function removeGroupBadge() {
+    const badge = document.querySelector('.scout-group-badge');
+    if (badge) badge.remove();
+    const groupNameEl = document.querySelector(".profile-header-details-community-name");
+    if (groupNameEl) delete groupNameEl.dataset.scoutProcessing;
+}
+
 // --- GLOBAL SETUP ---
 document.documentElement.style.setProperty('--scout-logo-url', `url('${chrome.runtime.getURL("scout_logo.png")}')`);
 
@@ -117,42 +127,49 @@ function getUserIdFromUrl() {
     return match ? match[1] : null;
 }
 
-// Fetcher for Main Profile/List Groups
+function getGroupIdFromUrl() {
+    const match = location.pathname.match(/\/(communities|groups)\/(\d+)/);
+    return match ? match[2] : null;
+}
+
+// Fetchers
 async function fetchScoutData(userId) {
     if (apiCache.has(userId)) return apiCache.get(userId);
-
     const fetchPromise = new Promise((resolve) => {
         chrome.runtime.sendMessage({ action: "checkUser", userId: userId }, (response) => {
             if (chrome.runtime.lastError || response.error) {
-                console.error(`SCOUT API skipped for ${userId}:`, chrome.runtime.lastError?.message || response.error);
-                apiCache.delete(userId); 
-                resolve(null);
-            } else {
-                resolve(response); 
-            }
+                apiCache.delete(userId); resolve(null);
+            } else { resolve(response); }
         });
     });
-
     apiCache.set(userId, fetchPromise);
     return fetchPromise;
 }
 
-// Fetcher for Terminated Friends
 async function fetchTerminatedData(userId) {
     if (termCache.has(userId)) return termCache.get(userId);
-
     const fetchPromise = new Promise((resolve) => {
         chrome.runtime.sendMessage({ action: "checkTerminatedFriends", userId: userId }, (response) => {
             if (chrome.runtime.lastError || !response || response.error) {
-                termCache.delete(userId); // Clear on fail so it can retry later
-                resolve(null);
-            } else {
-                resolve(response);
-            }
+                termCache.delete(userId); resolve(null);
+            } else { resolve(response); }
         });
     });
-
     termCache.set(userId, fetchPromise);
+    return fetchPromise;
+}
+
+async function fetchGroupData(groupId) {
+    const cacheKey = `group_${groupId}`;
+    if (apiCache.has(cacheKey)) return apiCache.get(cacheKey);
+    const fetchPromise = new Promise((resolve) => {
+        chrome.runtime.sendMessage({ action: "checkGroup", groupId: groupId }, (response) => {
+            if (chrome.runtime.lastError || !response || response.error) {
+                apiCache.delete(cacheKey); resolve(null);
+            } else { resolve(response); }
+        });
+    });
+    apiCache.set(cacheKey, fetchPromise);
     return fetchPromise;
 }
 
@@ -193,7 +210,6 @@ async function processMainProfile() {
     const userId = getUserIdFromUrl();
     if (!userId) return;
     
-    // Trigger Terminated Friends Scan independently of the main badge
     processTerminatedFriendsBadge(userId);
 
     if (!settings.mainBadgeEnabled) return;
@@ -202,7 +218,6 @@ async function processMainProfile() {
     if (!usernameEl) return;
 
     if (usernameEl.nextElementSibling && usernameEl.nextElementSibling.classList.contains("scout-dynamic-badge")) return;
-    
     if (usernameEl.dataset.scoutProcessing) return;
     usernameEl.dataset.scoutProcessing = "true";
 
@@ -229,16 +244,10 @@ async function processMainProfile() {
 async function processTerminatedFriendsBadge(userId) {
     if (!settings.termBadgeEnabled) return;
 
-    // Target the specific "Connections" button
     const connectionsBtn = document.querySelector(`a[href*="/users/${userId}/friends"]`);
-    
-    // Safety check: Ensure the button AND its parent exist before injecting
     if (!connectionsBtn || !connectionsBtn.parentElement) return;
-
-    // Prevent duplicate badges
     if (document.getElementById("scout-term-badge")) return;
 
-    // Create a modern pill badge
     const badge = document.createElement("div");
     badge.id = "scout-term-badge";
     badge.style.cssText = `
@@ -258,16 +267,9 @@ async function processTerminatedFriendsBadge(userId) {
         font-family: 'Builder Sans', 'Segoe UI', Tahoma, sans-serif;
     `;
     badge.textContent = "Scanning...";
-
-    // Append to the parent element instead of directly next to the <a> tag
-    // This stops React's flexbox hydration from panicking and deleting it
     connectionsBtn.parentElement.appendChild(badge);
 
-    // Fetch using the new cached system
     const response = await fetchTerminatedData(userId);
-
-    // Re-grab the badge from the DOM because React might have destroyed 
-    // the original while we were waiting for the background API!
     const liveBadge = document.getElementById("scout-term-badge");
     if (!liveBadge) return;
 
@@ -276,17 +278,149 @@ async function processTerminatedFriendsBadge(userId) {
         return;
     }
 
-    // Update the live badge with the final math
     if (response.terminatedCount > 0) {
         liveBadge.textContent = `${response.terminatedCount} Terminated`;
         liveBadge.style.backgroundColor = "rgba(231, 76, 60, 0.15)";
         liveBadge.style.border = "1px solid #e74c3c";
     } else {
         liveBadge.textContent = "0 Terminated";
-        liveBadge.style.color = "#2ecc71"; // Safe Green
+        liveBadge.style.color = "#2ecc71";
         liveBadge.style.backgroundColor = "rgba(46, 204, 113, 0.1)";
         liveBadge.style.border = "1px solid rgba(46, 204, 113, 0.3)";
     }
+}
+
+// ---------------- GROUP PAGE UI ----------------
+async function processGroupPage() {
+    if (!settings.groupBadgeEnabled) return;
+    if (!location.pathname.match(/\/(communities|groups)\//)) return;
+
+    const groupId = getGroupIdFromUrl();
+    if (!groupId) return;
+
+    const groupNameEl = document.querySelector(".profile-header-details-community-name");
+    if (!groupNameEl) return;
+
+    if (groupNameEl.querySelector(".scout-group-badge")) return;
+    if (groupNameEl.dataset.scoutProcessing) return;
+    groupNameEl.dataset.scoutProcessing = "true";
+
+    const data = await fetchGroupData(groupId);
+    if (!data) {
+        delete groupNameEl.dataset.scoutProcessing;
+        return;
+    }
+
+    if (!document.body.contains(groupNameEl)) return;
+    if (!settings.groupBadgeEnabled) return;
+    if (groupNameEl.querySelector(".scout-group-badge")) return;
+
+    const badge = document.createElement("span");
+    badge.className = "scout-badge scout-group-badge"; 
+
+    badge.style.cssText = `
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        height: 24px; 
+        line-height: 24px;
+        padding: 0 10px; 
+        border-radius: 6px; 
+        margin-left: 10px; 
+        font-size: 13px;
+        font-weight: 700;
+        vertical-align: middle;
+        box-sizing: border-box; 
+    `;
+
+    const logo = document.createElement("img");
+    logo.src = chrome.runtime.getURL("scout_logo.png");
+    logo.style.cssText = "width: 14px; height: 14px; margin-right: 6px; flex-shrink: 0;";
+    badge.appendChild(logo);
+
+    const textSpan = document.createElement("span");
+
+    if (data.isFlagged) {
+        badge.classList.add("scout-high");
+        textSpan.textContent = "DANGEROUS GROUP";
+        badge.title = "This group has been manually flagged by a SCOUT administrator due to safety concerns. Be extremely cautious with this group's activities.";
+    } else {
+        badge.classList.add("scout-safe");
+        textSpan.textContent = "SAFE";
+    }
+
+    badge.appendChild(textSpan);
+
+    groupNameEl.style.display = "inline-flex";
+    groupNameEl.style.alignItems = "center";
+
+    groupNameEl.appendChild(badge);
+}
+// ---------------- SEARCH PAGE UI ----------------
+function processCommunitySearch() {
+    if (!settings.groupBadgeEnabled) return;
+    if (!location.pathname.includes('/search/communities') && !location.pathname.includes('/search/groups')) return;
+
+    const groupLinks = document.querySelectorAll('a[href*="/communities/"], a[href*="/groups/"]');
+
+    groupLinks.forEach(async (link) => {
+
+        const match = link.getAttribute("href").match(/\/(communities|groups)\/(\d+)/);
+        if (!match) return;
+        const groupId = match[2];
+
+        const nameEl = link.querySelector('.font-header-2.text-overflow');
+        if (!nameEl) return;
+
+        if (nameEl.querySelector('.scout-search-badge')) return;
+        if (nameEl.dataset.scoutProcessing) return;
+        nameEl.dataset.scoutProcessing = "true";
+
+        const data = await fetchGroupData(groupId);
+        if (!data) {
+            delete nameEl.dataset.scoutProcessing;
+            return;
+        }
+
+        if (!document.body.contains(nameEl)) return;
+        if (!settings.groupBadgeEnabled) return;
+        if (nameEl.querySelector('.scout-search-badge')) return;
+        if (data.isFlagged) {
+            const badge = document.createElement("span");
+            badge.className = "scout-badge scout-search-badge scout-high"; 
+
+            badge.style.cssText = `
+                display: inline-flex;
+                align-items: center;
+                justify-content: center;
+                height: 20px; 
+                line-height: 20px;
+                padding: 0 6px; 
+                border-radius: 4px; 
+                margin-left: 8px; 
+                font-size: 11px;
+                font-weight: 700;
+                vertical-align: middle;
+                box-sizing: border-box;
+                color: white;
+                background-color: #e74c3c;
+            `;
+            
+            const logo = document.createElement("img");
+            logo.src = chrome.runtime.getURL("scout_logo.png");
+            logo.style.cssText = "width: 12px; height: 12px; margin-right: 4px; flex-shrink: 0;";
+            badge.appendChild(logo);
+
+            const textSpan = document.createElement("span");
+            textSpan.textContent = "DANGEROUS";
+            badge.appendChild(textSpan);
+
+            badge.title = "This group has been manually flagged by a SCOUT administrator due to safety concerns.";
+            nameEl.style.display = "inline-flex";
+            nameEl.style.alignItems = "center";
+            nameEl.appendChild(badge);
+        }
+    });
 }
 
 // ---------------- PAGINATED LISTS ----------------
@@ -354,6 +488,8 @@ const observer = new MutationObserver(() => {
     clearTimeout(debounceTimer);
     debounceTimer = setTimeout(() => {
         processMainProfile();
+        processGroupPage(); 
+        processCommunitySearch();
         processListLinks();
     }, 500); 
 });
@@ -362,16 +498,22 @@ observer.observe(document.body, { childList: true, subtree: true });
 window.addEventListener("hashchange", () => {
     setTimeout(() => {
         processMainProfile();
+        processGroupPage(); 
+        processCommunitySearch();
         processListLinks();
     }, 100); 
 });
 
 setInterval(() => {
     processMainProfile();
+    processGroupPage(); 
+    processCommunitySearch();
     processListLinks();
 }, 2000); 
 
 setTimeout(() => {
     processMainProfile();
+    processGroupPage(); 
+    processCommunitySearch();
     processListLinks();
 }, 500);

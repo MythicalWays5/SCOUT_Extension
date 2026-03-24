@@ -77,6 +77,10 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         handleTerminatedFriends(request.userId).then(sendResponse);
         return true;
     }
+    if (request.action === "checkGroup") {
+        handleCheckGroup(request.groupId).then(sendResponse);
+        return true;
+    }
 });
 
 async function handleCheckUser(userId) {
@@ -137,12 +141,22 @@ async function handleTerminatedFriends(userId) {
                 } catch (e) {
                 }
             }));
-            await new Promise(resolve => setTimeout(resolve, 150));  //simple wait time for rate limits
+            await new Promise(resolve => setTimeout(resolve, 150));
         }
 
         return { terminatedCount };
     } catch (err) {
         console.error("SCOUT Terminated Friends Error:", err);
+        return { error: err.message };
+    }
+}
+// ---------------- GROUP PAGE SCANNER ----------------
+async function handleCheckGroup(groupId) {
+    try {
+        const flaggedGroups = await getFlaggedGroups();
+        const isFlagged = flaggedGroups.has(parseInt(groupId));
+        return { isFlagged };
+    } catch (err) {
         return { error: err.message };
     }
 }
