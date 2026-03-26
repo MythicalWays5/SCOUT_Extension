@@ -1,4 +1,4 @@
-# 🛡️ S.C.O.U.T. Roblox (v1.3)
+# 🛡️ S.C.O.U.T. Roblox (v1.4)
 
 **S.C.O.U.T. Roblox** is a lightweight, community-driven Chrome Extension designed to help keep Roblox players safe. It automatically scans Roblox profiles and user lists (Friends, Followers, Following) to detect if an account is associated with known NSFW/ERP (Erotic Roleplay) groups. 
 
@@ -11,7 +11,8 @@ Made by the community, for the community. Stay safe.
 * **RoPro & Extension Compatible:** Built using a "Zero-Touch DOM" method, S.C.O.U.T. has options to disable its user list badges if at all other extensions like RoPro or RoGold clash with it.
 * **Auto-Update Notifications:** You will never be left behind. S.C.O.U.T. will notify you via a desktop notification and an in-page Roblox banner whenever a new security update is ready.
 * **Terminated Friends count:** On the main profile page of a user, you will see the number of terminated friends of the user.
-* **[NEW] Group Scanner:** On group/community main page and search page, this extension will flag detected groups.
+* **Group Scanner:** On group/community main page and search page, this extension will flag detected groups.
+* **[NEW] Dangerous User Warning:** On the profile page of the user, you may get an exclamation warning beside the safety badge if the user has been logged dangerous by the S.C.O.U.T. autonomous system. This is irrespective of the count of flagged groups.
 
 ---
 

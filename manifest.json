@@ -1,13 +1,14 @@
 {
   "manifest_version": 3,
   "name": "S.C.O.U.T. Roblox",
-  "version": "1.3",
+  "version": "1.4",
   "description": "Safety scanner for Roblox users. Made by the community, for the community. Stay safe.",
   "permissions": ["activeTab", "storage", "notifications"],
   "host_permissions": [
     "https://*.roblox.com/*",
     "https://raw.githubusercontent.com/*",
-    "https://scout-extension-notif.odinseyerblx.workers.dev/*"
+    "https://scout-extension-notif.odinseyerblx.workers.dev/*",
+    "https://scout-main-node.eyesofjusticesquadrblx.workers.dev/*"
   ],
   "background": {
     "service_worker": "background.js"

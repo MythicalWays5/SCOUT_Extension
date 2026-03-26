@@ -81,6 +81,10 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         handleCheckGroup(request.groupId).then(sendResponse);
         return true;
     }
+    if (request.action === "checkDatabase") {
+        handleCheckDatabase(request.userId).then(sendResponse);
+        return true;
+    }
 });
 
 async function handleCheckUser(userId) {
@@ -99,7 +103,14 @@ async function handleCheckUser(userId) {
                 flaggedCount++;
             }
         }
-
+        if (flaggedCount >= 5) {
+            fetch("https://scout-main-node.eyesofjusticesquadrblx.workers.dev/", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ userId: parseInt(userId) })
+            }).catch(() => {
+            });
+        }
         let riskLevel = "safe";
         if (flaggedCount >= 10) riskLevel = "high";
         else if (flaggedCount >= 5) riskLevel = "medium";
@@ -158,5 +169,23 @@ async function handleCheckGroup(groupId) {
         return { isFlagged };
     } catch (err) {
         return { error: err.message };
+    }
+}
+// ---------------- DATABASE CHECKER ----------------
+async function handleCheckDatabase(userId) {
+    try {
+        const res = await fetch("https://scout-main-node.eyesofjusticesquadrblx.workers.dev/", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ action: "check_db", userId: parseInt(userId) })
+        });
+        
+        if (!res.ok) return { isFlagged: false };
+        const data = await res.json();
+        
+        return { isFlagged: data.isDangerous };
+    } catch (err) {
+        console.error("SCOUT DB Check Error:", err);
+        return { isFlagged: false };
     }
 }

@@ -146,6 +146,20 @@ async function fetchScoutData(userId) {
     return fetchPromise;
 }
 
+async function fetchDatabaseData(userId) {
+    const cacheKey = `db_${userId}`;
+    if (apiCache.has(cacheKey)) return apiCache.get(cacheKey);
+    const fetchPromise = new Promise((resolve) => {
+        chrome.runtime.sendMessage({ action: "checkDatabase", userId: userId }, (response) => {
+            if (chrome.runtime.lastError || !response) {
+                apiCache.delete(cacheKey); resolve({ isFlagged: false });
+            } else { resolve(response); }
+        });
+    });
+    apiCache.set(cacheKey, fetchPromise);
+    return fetchPromise;
+}
+
 async function fetchTerminatedData(userId) {
     if (termCache.has(userId)) return termCache.get(userId);
     const fetchPromise = new Promise((resolve) => {
@@ -203,7 +217,32 @@ function createMainProfileBadge(data) {
     badge.appendChild(textSpan);
     return badge;
 }
+// ---------------- DATABASE WARNING ICON ----------------
+async function processDatabaseWarning() {
+    if (!settings.mainBadgeEnabled) return;
+    if (!location.pathname.includes('/profile')) return;
 
+    const userId = getUserIdFromUrl();
+    if (!userId) return;
+    const atUsernameEl = document.querySelector(".stylistic-alts-username");
+    if (!atUsernameEl) return;
+
+    if (atUsernameEl.querySelector(".scout-db-warning")) return;
+    if (atUsernameEl.dataset.scoutDbChecked) return;
+    atUsernameEl.dataset.scoutDbChecked = "true";
+    chrome.runtime.sendMessage({ action: "checkDatabase", userId: userId }, (response) => {
+        if (response && response.isFlagged) {
+            const warningIcon = document.createElement("span");
+            warningIcon.className = "scout-db-warning";
+            warningIcon.textContent = "!";
+            warningIcon.setAttribute("data-tooltip", "This user has been flagged dangerous by the SCOUT Autonomous System. They possibly have or had links to inappropriate Roblox networks. Exercise extreme caution.");
+            atUsernameEl.style.display = "inline-flex";
+            atUsernameEl.style.alignItems = "center";
+            
+            atUsernameEl.appendChild(warningIcon);
+        }
+    });
+}
 async function processMainProfile() {
     if (!location.pathname.includes('/profile')) return;
 
@@ -220,8 +259,11 @@ async function processMainProfile() {
     if (usernameEl.nextElementSibling && usernameEl.nextElementSibling.classList.contains("scout-dynamic-badge")) return;
     if (usernameEl.dataset.scoutProcessing) return;
     usernameEl.dataset.scoutProcessing = "true";
+    const [data, dbData] = await Promise.all([
+        fetchScoutData(userId),
+        fetchDatabaseData(userId)
+    ]);
 
-    const data = await fetchScoutData(userId);
     if (!data) {
         delete usernameEl.dataset.scoutProcessing; 
         return;
@@ -230,10 +272,17 @@ async function processMainProfile() {
     if (!document.body.contains(usernameEl)) return;
     if (!settings.mainBadgeEnabled) return;
     if (usernameEl.nextElementSibling && usernameEl.nextElementSibling.classList.contains("scout-dynamic-badge")) return;
-
     const badge = createMainProfileBadge(data);
     usernameEl.insertAdjacentElement("afterend", badge);
-    
+    if (dbData && dbData.isFlagged) {
+        const warningIcon = document.createElement("span");
+        warningIcon.className = "scout-db-warning-wrapper";
+        warningIcon.textContent = "!";
+        warningIcon.setAttribute("data-tooltip", "This user has been flagged dangerous by the SCOUT Autonomous System. They possibly have or had links to inappropriate Roblox networks. Exercise extreme caution.");
+        
+        badge.insertAdjacentElement("afterend", warningIcon);
+    }
+
     if (usernameEl.parentElement) {
         usernameEl.parentElement.style.display = "flex";
         usernameEl.parentElement.style.alignItems = "center";
