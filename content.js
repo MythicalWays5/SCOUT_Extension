@@ -98,6 +98,10 @@ function removeMainBadge() {
 function removeListBadges() {
     dynamicStyleTag.innerHTML = "";
     processedListUsers.clear();
+    document.querySelectorAll('.scout-list-warning').forEach(icon => icon.remove());
+    document.querySelectorAll('[data-scout-warning-processed]').forEach(el => {
+        el.removeAttribute('data-scout-warning-processed');
+    });
 }
 
 function removeTermBadge() {
@@ -227,13 +231,13 @@ async function processDatabaseWarning() {
     const atUsernameEl = document.querySelector(".stylistic-alts-username");
     if (!atUsernameEl) return;
 
-    if (atUsernameEl.querySelector(".scout-db-warning")) return;
+    if (atUsernameEl.querySelector(".scout-db-warning-wrapper")) return;
     if (atUsernameEl.dataset.scoutDbChecked) return;
     atUsernameEl.dataset.scoutDbChecked = "true";
     chrome.runtime.sendMessage({ action: "checkDatabase", userId: userId }, (response) => {
         if (response && response.isFlagged) {
             const warningIcon = document.createElement("span");
-            warningIcon.className = "scout-db-warning";
+            warningIcon.className = "scout-db-warning-wrapper";
             warningIcon.textContent = "!";
             warningIcon.setAttribute("data-tooltip", "This user has been flagged dangerous by the SCOUT Autonomous System. They possibly have or had links to inappropriate Roblox networks. Exercise extreme caution.");
             atUsernameEl.style.display = "inline-flex";
@@ -355,7 +359,7 @@ async function processGroupPage() {
     groupNameEl.dataset.scoutProcessing = "true";
 
     const data = await fetchGroupData(groupId);
-    if (!data) {
+    if (!data || !data.isFlagged) {
         delete groupNameEl.dataset.scoutProcessing;
         return;
     }
@@ -365,7 +369,7 @@ async function processGroupPage() {
     if (groupNameEl.querySelector(".scout-group-badge")) return;
 
     const badge = document.createElement("span");
-    badge.className = "scout-badge scout-group-badge"; 
+    badge.className = "scout-badge scout-group-badge scout-high"; 
 
     badge.style.cssText = `
         display: inline-flex;
@@ -388,16 +392,9 @@ async function processGroupPage() {
     badge.appendChild(logo);
 
     const textSpan = document.createElement("span");
-
-    if (data.isFlagged) {
-        badge.classList.add("scout-high");
-        textSpan.textContent = "DANGEROUS GROUP";
-        badge.title = "This group has been manually flagged by a SCOUT administrator due to safety concerns. Be extremely cautious with this group's activities.";
-    } else {
-        badge.classList.add("scout-safe");
-        textSpan.textContent = "SAFE";
-    }
-
+    textSpan.textContent = "DANGEROUS GROUP";
+    badge.title = "This group has been manually flagged by a SCOUT administrator due to safety concerns. Be extremely cautious with this group's activities.";
+    
     badge.appendChild(textSpan);
 
     groupNameEl.style.display = "inline-flex";
@@ -476,6 +473,14 @@ function processCommunitySearch() {
 function processListLinks() {
     if (!settings.listBadgeEnabled) return;
     if (!location.pathname.match(/\/(friends|followers|followings?)/)) return;
+    document.querySelectorAll('.scout-db-warning-wrapper').forEach(badge => {
+        if (badge.parentElement && badge.parentElement.closest('.avatar-card-content, .friend-item')) {
+            const prev = badge.previousElementSibling;
+            if (!prev || prev.tagName !== 'A' || !prev.getAttribute("href")?.includes("/users/")) {
+                badge.remove();
+            }
+        }
+    });
 
     const links = Array.from(document.querySelectorAll('.avatar-name[href*="/users/"], .friend-name[href*="/users/"]'))
         .filter(a => a.textContent.trim().length > 0);
@@ -486,7 +491,34 @@ function processListLinks() {
         const userId = match[1];
 
         if (userId === getUserIdFromUrl()) return;
-        
+        if (link.dataset.scoutUserId !== userId) {
+            const nextEl = link.nextElementSibling;
+            if (nextEl && nextEl.classList.contains("scout-db-warning-wrapper")) {
+                nextEl.remove();
+            }
+            link.removeAttribute("data-scout-warning-processed");
+            link.dataset.scoutUserId = userId;
+        }
+        if (!link.dataset.scoutWarningProcessed) {
+            link.dataset.scoutWarningProcessed = "true";
+            
+            const dbData = await fetchDatabaseData(userId);
+            if (document.body.contains(link) && link.dataset.scoutUserId === userId) {
+                if (dbData && dbData.isFlagged && settings.listBadgeEnabled) {
+                    if (!link.nextElementSibling || !link.nextElementSibling.classList.contains("scout-db-warning-wrapper")) {
+                        const warningIcon = document.createElement("span");
+                        warningIcon.className = "scout-db-warning-wrapper";
+                        warningIcon.textContent = "!";
+                        warningIcon.setAttribute("data-tooltip", "This user has been flagged dangerous by the SCOUT Autonomous System. They possibly have or had links to inappropriate Roblox networks. Exercise extreme caution.");
+                        
+                        warningIcon.style.transform = "scale(0.85)"; 
+                        warningIcon.style.marginLeft = "6px";
+
+                        link.insertAdjacentElement("afterend", warningIcon);
+                    }
+                }
+            }
+        }
         if (processedListUsers.has(userId)) return;
         processedListUsers.add(userId); 
 
