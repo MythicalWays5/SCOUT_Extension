@@ -182,8 +182,11 @@ async function handleCheckDatabase(userId) {
         
         if (!res.ok) return { isFlagged: false };
         const data = await res.json();
-        
-        return { isFlagged: data.isDangerous };
+        return { 
+            isFlagged: data.isDangerous,
+            status: data.status,
+            risk: data.risk
+        };
     } catch (err) {
         console.error("SCOUT DB Check Error:", err);
         return { isFlagged: false };

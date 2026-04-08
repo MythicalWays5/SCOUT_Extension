@@ -3,15 +3,34 @@ console.log("SCOUT extension active");
 const apiCache = new Map();
 const termCache = new Map(); 
 const processedListUsers = new Set();
-let settings = { mainBadgeEnabled: true, listBadgeEnabled: true, termBadgeEnabled: true, groupBadgeEnabled: true };
-
-// --- READ SETTINGS AND CHECK FOR UPDATES ---
-chrome.storage.local.get(['mainBadgeEnabled', 'listBadgeEnabled', 'termBadgeEnabled', 'groupBadgeEnabled', 'updateAvailable'], (result) => {
+let settings = { 
+    mainBadgeEnabled: true, 
+    listBadgeEnabled: true, 
+    termBadgeEnabled: true, 
+    groupBadgeEnabled: true, 
+    autoPopupEnabled: true 
+};
+chrome.storage.local.get([
+    'mainBadgeEnabled', 
+    'listBadgeEnabled', 
+    'termBadgeEnabled', 
+    'groupBadgeEnabled', 
+    'autoPopupEnabled', 
+    'updateAvailable'
+], (result) => {
     if (result.mainBadgeEnabled !== undefined) settings.mainBadgeEnabled = result.mainBadgeEnabled;
     if (result.listBadgeEnabled !== undefined) settings.listBadgeEnabled = result.listBadgeEnabled;
     if (result.termBadgeEnabled !== undefined) settings.termBadgeEnabled = result.termBadgeEnabled;
     if (result.groupBadgeEnabled !== undefined) settings.groupBadgeEnabled = result.groupBadgeEnabled;
+    if (result.autoPopupEnabled !== undefined) settings.autoPopupEnabled = result.autoPopupEnabled;
+    
     if (result.updateAvailable) showInPageUpdateBanner();
+    setTimeout(() => {
+        processMainProfile();
+        processGroupPage(); 
+        processCommunitySearch();
+        processListLinks();
+    }, 100);
 });
 
 chrome.storage.onChanged.addListener((changes) => {
@@ -30,6 +49,9 @@ chrome.storage.onChanged.addListener((changes) => {
     if (changes.groupBadgeEnabled) {
         settings.groupBadgeEnabled = changes.groupBadgeEnabled.newValue;
         if (!settings.groupBadgeEnabled) removeGroupBadge();
+    }
+    if (changes.autoPopupEnabled) {
+        settings.autoPopupEnabled = changes.autoPopupEnabled.newValue;
     }
     if (changes.updateAvailable && changes.updateAvailable.newValue === true) {
         showInPageUpdateBanner();
@@ -91,8 +113,6 @@ function showInPageUpdateBanner() {
 function removeMainBadge() {
     const badge = document.querySelector('.scout-dynamic-badge');
     if (badge) badge.remove();
-    const usernameEl = document.getElementById("profile-header-title-container-name");
-    if (usernameEl) delete usernameEl.dataset.scoutProcessing;
 }
 
 function removeListBadges() {
@@ -190,6 +210,89 @@ async function fetchGroupData(groupId) {
     apiCache.set(cacheKey, fetchPromise);
     return fetchPromise;
 }
+async function showScoutIntelligenceModal(userId, status, risk) {
+    if (document.getElementById('scout-intel-modal')) return;
+
+    const statusDefs = {
+        "SHADOW_SCAN": "Flagged instantly by SCOUT's automated security grid. This detection is highly reliable, calculated using a strict mathematical formula that analyzes the user's active networks and group intersections. <b>Exercise extreme caution around this profile.</b>",
+        "PULSE_CRAWL": "Flagged by SCOUT's background pulse scans. This is a highly accurate detection driven by a mathematical risk formula that constantly monitors and cross-references known dangerous networks. <b>Exercise extreme caution around this profile.</b>",
+        "DEEP_CRAWL": "Flagged by SCOUT's heavy Deep Crawler. This system mathematically spider-webs through the connections of known threats to uncover hidden networks, making this a highly reliable detection. <b>Exercise extreme caution around this profile.</b>",
+        "MANUAL": "Manually investigated and flagged by a S.C.O.U.T. Administrator using verified evidence. <b>Exercise extreme caution around this profile.</b>"
+    };
+
+    const riskDefs = {
+        "CLOTHING": "User was involved with creating inappropriate fetish/kink clothing.",
+        "ACTIVITY": "User was witnessed involving themselves fully with inappropriate networks and conduct.",
+        "BIO": "User was found having an extremely inappropriate description, linking themselves to inappropriate networks.",
+        "ASSETS": "User was found to be the owner/creator of inappropriate/NSFW assets on Roblox (audio, meshes, images, etc)."
+    };
+
+    const displayStatus = status || "UNKNOWN";
+    const statusDesc = statusDefs[displayStatus] || "Detected through legacy or unknown S.C.O.U.T. protocols.";
+
+    const overlay = document.createElement("div");
+    overlay.id = "scout-intel-modal";
+    overlay.className = "scout-modal-overlay";
+
+    let riskHtml = "";
+    if (displayStatus === "MANUAL") {
+        const isModernTag = risk && riskDefs[risk];
+        const displayRisk = isModernTag ? risk : "LEGACY";
+        const displayRiskDesc = isModernTag 
+            ? riskDefs[risk] 
+            : "User was manually flagged in an older version of S.C.O.U.T. before structured violation tags were introduced. Threat remains verified.";
+
+        riskHtml = `
+            <div class="scout-modal-section">
+                <div class="scout-modal-label">Violation Keyword</div>
+                <div class="scout-modal-value" style="color: #e67e22;">${displayRisk}</div>
+                <div class="scout-modal-desc">${displayRiskDesc}</div>
+            </div>
+        `;
+    }
+
+    overlay.innerHTML = `
+        <div class="scout-modal-box" onclick="event.stopPropagation()">
+            <div class="scout-modal-header">
+                <img src="${chrome.runtime.getURL('scout_logo.png')}" style="width: 24px; height: 24px;">
+                <h3 class="scout-modal-title">Threat Intelligence Report</h3>
+            </div>
+            <div class="scout-modal-section">
+                <div class="scout-modal-label">Target Profile</div>
+                <div class="scout-modal-value" id="scout-modal-target-username">Loading Username...</div>
+            </div>
+            <div class="scout-modal-section">
+                <div class="scout-modal-label">Detection Vector</div>
+                <div class="scout-modal-value" style="color: #e74c3c;">${displayStatus}</div>
+                <div class="scout-modal-desc">${statusDesc}</div>
+            </div>
+            ${riskHtml}
+            <button class="scout-modal-close" id="scout-modal-close-btn">Acknowledge</button>
+        </div>
+    `;
+
+    document.body.appendChild(overlay);
+    requestAnimationFrame(() => overlay.classList.add("scout-visible"));
+    try {
+        const uRes = await fetch(`https://users.roblox.com/v1/users/${userId}`);
+        if (uRes.ok) {
+            const uData = await uRes.json();
+            const nameEl = document.getElementById("scout-modal-target-username");
+            if (nameEl) nameEl.textContent = `@${uData.name}`;
+        }
+    } catch(e) {
+        const nameEl = document.getElementById("scout-modal-target-username");
+        if (nameEl) nameEl.textContent = "Unknown User";
+    }
+
+    const closeModal = () => {
+        overlay.classList.remove("scout-visible");
+        setTimeout(() => overlay.remove(), 200);
+    };
+
+    document.getElementById("scout-modal-close-btn").addEventListener("click", closeModal);
+    overlay.addEventListener("click", closeModal);
+}
 
 // ---------------- MAIN PROFILE HEADER ----------------
 function createMainProfileBadge(data) {
@@ -221,32 +324,7 @@ function createMainProfileBadge(data) {
     badge.appendChild(textSpan);
     return badge;
 }
-// ---------------- DATABASE WARNING ICON ----------------
-async function processDatabaseWarning() {
-    if (!settings.mainBadgeEnabled) return;
-    if (!location.pathname.includes('/profile')) return;
 
-    const userId = getUserIdFromUrl();
-    if (!userId) return;
-    const atUsernameEl = document.querySelector(".stylistic-alts-username");
-    if (!atUsernameEl) return;
-
-    if (atUsernameEl.querySelector(".scout-db-warning-wrapper")) return;
-    if (atUsernameEl.dataset.scoutDbChecked) return;
-    atUsernameEl.dataset.scoutDbChecked = "true";
-    chrome.runtime.sendMessage({ action: "checkDatabase", userId: userId }, (response) => {
-        if (response && response.isFlagged) {
-            const warningIcon = document.createElement("span");
-            warningIcon.className = "scout-db-warning-wrapper";
-            warningIcon.textContent = "!";
-            warningIcon.setAttribute("data-tooltip", "This user has been flagged dangerous by the SCOUT Autonomous System. They possibly have or had links to inappropriate Roblox networks. Exercise extreme caution.");
-            atUsernameEl.style.display = "inline-flex";
-            atUsernameEl.style.alignItems = "center";
-            
-            atUsernameEl.appendChild(warningIcon);
-        }
-    });
-}
 async function processMainProfile() {
     if (!location.pathname.includes('/profile')) return;
 
@@ -255,41 +333,49 @@ async function processMainProfile() {
     
     processTerminatedFriendsBadge(userId);
 
-    if (!settings.mainBadgeEnabled) return;
-
     const usernameEl = document.getElementById("profile-header-title-container-name");
     if (!usernameEl) return;
 
-    if (usernameEl.nextElementSibling && usernameEl.nextElementSibling.classList.contains("scout-dynamic-badge")) return;
     if (usernameEl.dataset.scoutProcessing) return;
     usernameEl.dataset.scoutProcessing = "true";
+    
     const [data, dbData] = await Promise.all([
         fetchScoutData(userId),
         fetchDatabaseData(userId)
     ]);
 
-    if (!data) {
-        delete usernameEl.dataset.scoutProcessing; 
-        return;
-    }
-
     if (!document.body.contains(usernameEl)) return;
-    if (!settings.mainBadgeEnabled) return;
-    if (usernameEl.nextElementSibling && usernameEl.nextElementSibling.classList.contains("scout-dynamic-badge")) return;
-    const badge = createMainProfileBadge(data);
-    usernameEl.insertAdjacentElement("afterend", badge);
-    if (dbData && dbData.isFlagged) {
-        const warningIcon = document.createElement("span");
-        warningIcon.className = "scout-db-warning-wrapper";
-        warningIcon.textContent = "!";
-        warningIcon.setAttribute("data-tooltip", "This user has been flagged dangerous by the SCOUT Autonomous System. They possibly have or had links to inappropriate Roblox networks. Exercise extreme caution.");
-        
-        badge.insertAdjacentElement("afterend", warningIcon);
-    }
+    let finalBadgeNode = usernameEl; 
+    if (settings.mainBadgeEnabled && data && !usernameEl.nextElementSibling?.classList.contains("scout-dynamic-badge")) {
+        const badge = createMainProfileBadge(data);
+        usernameEl.insertAdjacentElement("afterend", badge);
+        finalBadgeNode = badge;
 
-    if (usernameEl.parentElement) {
-        usernameEl.parentElement.style.display = "flex";
-        usernameEl.parentElement.style.alignItems = "center";
+        if (usernameEl.parentElement) {
+            usernameEl.parentElement.style.display = "flex";
+            usernameEl.parentElement.style.alignItems = "center";
+        }
+    }
+    if (dbData && dbData.isFlagged) {
+        const parentContainer = usernameEl.parentElement;
+        if (parentContainer && !parentContainer.querySelector(".scout-db-warning-wrapper")) {
+            const warningIcon = document.createElement("span");
+            warningIcon.className = "scout-db-warning-wrapper";
+            warningIcon.textContent = "!";
+            warningIcon.setAttribute("data-tooltip", "This user has been flagged dangerous by the SCOUT Autonomous System. Click for details.");
+            
+            warningIcon.addEventListener("click", (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                showScoutIntelligenceModal(userId, dbData.status, dbData.risk); 
+            });
+
+            finalBadgeNode.insertAdjacentElement("afterend", warningIcon);
+        }
+        if (settings.autoPopupEnabled && !window.scoutAutoPopupShown) {
+            window.scoutAutoPopupShown = true;
+            showScoutIntelligenceModal(userId, dbData.status, dbData.risk);
+        }
     }
 }
 
@@ -402,6 +488,7 @@ async function processGroupPage() {
 
     groupNameEl.appendChild(badge);
 }
+
 // ---------------- SEARCH PAGE UI ----------------
 function processCommunitySearch() {
     if (!settings.groupBadgeEnabled) return;
@@ -473,6 +560,7 @@ function processCommunitySearch() {
 function processListLinks() {
     if (!settings.listBadgeEnabled) return;
     if (!location.pathname.match(/\/(friends|followers|followings?)/)) return;
+    
     document.querySelectorAll('.scout-db-warning-wrapper').forEach(badge => {
         if (badge.parentElement && badge.parentElement.closest('.avatar-card-content, .friend-item')) {
             const prev = badge.previousElementSibling;
@@ -491,6 +579,7 @@ function processListLinks() {
         const userId = match[1];
 
         if (userId === getUserIdFromUrl()) return;
+        
         if (link.dataset.scoutUserId !== userId) {
             const nextEl = link.nextElementSibling;
             if (nextEl && nextEl.classList.contains("scout-db-warning-wrapper")) {
@@ -499,6 +588,7 @@ function processListLinks() {
             link.removeAttribute("data-scout-warning-processed");
             link.dataset.scoutUserId = userId;
         }
+        
         if (!link.dataset.scoutWarningProcessed) {
             link.dataset.scoutWarningProcessed = "true";
             
@@ -509,16 +599,23 @@ function processListLinks() {
                         const warningIcon = document.createElement("span");
                         warningIcon.className = "scout-db-warning-wrapper";
                         warningIcon.textContent = "!";
-                        warningIcon.setAttribute("data-tooltip", "This user has been flagged dangerous by the SCOUT Autonomous System. They possibly have or had links to inappropriate Roblox networks. Exercise extreme caution.");
+                        warningIcon.setAttribute("data-tooltip", "This user has been flagged dangerous by the SCOUT Autonomous System. Click for details.");
                         
                         warningIcon.style.transform = "scale(0.85)"; 
                         warningIcon.style.marginLeft = "6px";
+                        
+                        warningIcon.addEventListener("click", (e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            showScoutIntelligenceModal(userId, dbData.status, dbData.risk);
+                        });
 
                         link.insertAdjacentElement("afterend", warningIcon);
                     }
                 }
             }
         }
+        
         if (processedListUsers.has(userId)) return;
         processedListUsers.add(userId); 
 
@@ -590,11 +687,4 @@ setInterval(() => {
     processGroupPage(); 
     processCommunitySearch();
     processListLinks();
-}, 2000); 
-
-setTimeout(() => {
-    processMainProfile();
-    processGroupPage(); 
-    processCommunitySearch();
-    processListLinks();
-}, 500);
+}, 2000);

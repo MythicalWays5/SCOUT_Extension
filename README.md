@@ -1,13 +1,8 @@
-# 🛡️ S.C.O.U.T. Roblox (v1.45)
+# 🛡️ S.C.O.U.T. Roblox (v1.5)
 
 **S.C.O.U.T. Roblox** is a lightweight, community-driven Chrome Extension designed to help keep Roblox players safe. It automatically scans Roblox profiles and user lists (Friends, Followers, Following) to detect if an account is associated with known NSFW/ERP (Erotic Roleplay) groups. This extension is a part of the S.C.O.U.T. autonomous safety ecosystem.
 
 Made by the community, for the community. Stay safe.
----
----
-## 🛠️ Fixes (v1.45)
-* **Group Scanner**: The "Safe" badge from the group page has been removed. This is to avoid possible confusion between an actual "safe" group and a potentially unchecked dangerous group. Always excercise caution before joining new groups.
-* **[NEW] Expanded Dangerous User flag**: The SCOUT Autonomous System will now flag user lists. Its display setting is merged with "User List Badges".
 ---
 
 ## ✨ Features
@@ -17,8 +12,15 @@ Made by the community, for the community. Stay safe.
 * **Auto-Update Notifications:** You will never be left behind. S.C.O.U.T. will notify you via a desktop notification and an in-page Roblox banner whenever a new security update is ready.
 * **Terminated Friends count:** On the main profile page of a user, you will see the number of terminated friends of the user.
 * **Group Scanner:** On group/community main page and search page, this extension will flag detected groups.
-* **[NEW] Dangerous User Warning:** On the profile page of the user, you may get an exclamation warning beside the safety badge if the user has been logged dangerous by the S.C.O.U.T. autonomous system. This is irrespective of the count of flagged groups.
+* **Dangerous User Warning:** On the profile page of the user, you may get an exclamation warning beside the safety badge if the user has been logged dangerous by the S.C.O.U.T. autonomous system. This is irrespective of the count of flagged groups.
+* **[NEW] Threat Report Pop Ups:** Interacting with the exclamation mark on profiles, or opening a flagged profile will now give a "report" like pop up which states how the user was detected by the S.C.O.U.T. systems. Auto-pop ups can be disabled in the settings.
 
+---
+---
+## 🛠️ Fixes (v1.5)
+* **Group Scanner**: The "Safe" badge from the group page has been removed. This is to avoid possible confusion between an actual "safe" group and a potentially unchecked dangerous group. Always excercise caution before joining new groups.
+* **Expanded Dangerous User flag**: The SCOUT Autonomous System will now flag user lists. Its display setting is merged with "User List Badges".
+* Updated the way extension settings are saved. It should be more robust and reliable.
 ---
 
 ## 🔒 Privacy & Safety Guarantee

@@ -3,47 +3,48 @@ document.addEventListener('DOMContentLoaded', () => {
     const termToggle = document.getElementById('term-badge-toggle');
     const groupToggle = document.getElementById('group-badge-toggle');
     const listToggle = document.getElementById('list-badge-toggle');
-    
+    const autoPopupToggle = document.getElementById('auto-popup-toggle');
     const updateBanner = document.getElementById('update-banner');
     const updateBtn = document.getElementById('update-btn');
-
-    // Fetch saved settings or default them to true
     chrome.storage.local.get({
         mainBadgeEnabled: true,
         termBadgeEnabled: true, 
         groupBadgeEnabled: true,
         listBadgeEnabled: true,
+        autoPopupEnabled: true,
         updateAvailable: false
     }, (items) => {
-        mainToggle.checked = items.mainBadgeEnabled;
-        termToggle.checked = items.termBadgeEnabled;
-        groupToggle.checked = items.groupBadgeEnabled;
-        listToggle.checked = items.listBadgeEnabled;
+        if (mainToggle) mainToggle.checked = items.mainBadgeEnabled;
+        if (termToggle) termToggle.checked = items.termBadgeEnabled;
+        if (groupToggle) groupToggle.checked = items.groupBadgeEnabled;
+        if (listToggle) listToggle.checked = items.listBadgeEnabled;
+        if (autoPopupToggle) autoPopupToggle.checked = items.autoPopupEnabled;
 
-        if (items.updateAvailable) {
+        if (items.updateAvailable && updateBanner) {
             updateBanner.style.display = 'block';
         }
     });
 
-    updateBtn.addEventListener('click', () => {
-        chrome.tabs.create({ url: "https://github.com/MythicalWays5/SCOUT_Extension" });
-        chrome.tabs.create({ url: "https://github.com/MythicalWays5/SCOUT_Extension/archive/refs/heads/main.zip", active: false });
-    });
+    if (updateBtn) {
+        updateBtn.addEventListener('click', () => {
+            chrome.tabs.create({ url: "https://github.com/MythicalWays5/SCOUT_Extension" });
+            chrome.tabs.create({ url: "https://github.com/MythicalWays5/SCOUT_Extension/archive/refs/heads/main.zip", active: false });
+        });
+    }
 
-    // Save settings when toggled
-    mainToggle.addEventListener('change', () => {
-        chrome.storage.local.set({ mainBadgeEnabled: mainToggle.checked });
-    });
-
-    termToggle.addEventListener('change', () => {
-        chrome.storage.local.set({ termBadgeEnabled: termToggle.checked });
-    });
-
-    groupToggle.addEventListener('change', () => {
-        chrome.storage.local.set({ groupBadgeEnabled: groupToggle.checked });
-    });
-
-    listToggle.addEventListener('change', () => {
-        chrome.storage.local.set({ listBadgeEnabled: listToggle.checked });
-    });
+    if (mainToggle) {
+        mainToggle.addEventListener('change', () => chrome.storage.local.set({ mainBadgeEnabled: mainToggle.checked }));
+    }
+    if (termToggle) {
+        termToggle.addEventListener('change', () => chrome.storage.local.set({ termBadgeEnabled: termToggle.checked }));
+    }
+    if (groupToggle) {
+        groupToggle.addEventListener('change', () => chrome.storage.local.set({ groupBadgeEnabled: groupToggle.checked }));
+    }
+    if (listToggle) {
+        listToggle.addEventListener('change', () => chrome.storage.local.set({ listBadgeEnabled: listToggle.checked }));
+    }
+    if (autoPopupToggle) {
+        autoPopupToggle.addEventListener('change', () => chrome.storage.local.set({ autoPopupEnabled: autoPopupToggle.checked }));
+    }
 });
