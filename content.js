@@ -254,10 +254,10 @@ async function showScoutIntelligenceModal(userId, status, risk) {
     if (document.getElementById('scout-intel-modal')) return;
 
     const statusDefs = {
-        "SHADOW_SCAN": "Flagged instantly by SCOUT's automated security grid. This detection is highly reliable, calculated using a strict mathematical formula that analyzes the user's active networks and group intersections. <b>Exercise extreme caution around this profile.</b>",
-        "PULSE_CRAWL": "Flagged by SCOUT's background pulse scans. This is a highly accurate detection driven by a mathematical risk formula that constantly monitors and cross-references known dangerous networks. <b>Exercise extreme caution around this profile.</b>",
-        "DEEP_CRAWL": "Flagged by SCOUT's heavy Deep Crawler. This system mathematically spider-webs through the connections of known threats to uncover hidden networks, making this a highly reliable detection. <b>Exercise extreme caution around this profile.</b>",
-        "MANUAL": "Manually investigated and flagged by a S.C.O.U.T. Administrator using verified evidence. <b>Exercise extreme caution around this profile.</b>"
+        "SHADOW_SCAN": "<b>This user very likely is or was a part of the inappropriate/NSFW Roblox account network.</b><br>Flagged instantly by SCOUT's automated security grid. This detection is highly reliable, calculated using a strict mathematical formula that analyzes the user's active networks and group intersections.<br><b>Exercise extreme caution around this profile.</b>",
+        "PULSE_CRAWL": "<b>This user very likely is or was a part of the inappropriate/NSFW Roblox account network.</b><br>Flagged by SCOUT's background pulse scans. This is a highly accurate detection driven by a mathematical risk formula that constantly monitors and cross-references known dangerous networks.<br><b>Exercise extreme caution around this profile.</b>",
+        "DEEP_CRAWL": "<b>This user very likely is or was a part of the inappropriate/NSFW Roblox account network.</b><br>Flagged by SCOUT's heavy Deep Crawler. This system mathematically spider-webs through the connections of known threats to uncover hidden networks, making this a highly reliable detection.<br><b>Exercise extreme caution around this profile.</b>",
+        "MANUAL": "Manually investigated and flagged by a S.C.O.U.T. Administrator using verified evidence.<br><b>Exercise extreme caution around this profile.</b>"
     };
 
     const riskDefs = {
