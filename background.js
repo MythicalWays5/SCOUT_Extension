@@ -5,6 +5,25 @@ const MASTER_LIST_URL = "https://raw.githubusercontent.com/OdinsEyeRBLX/RobloxSa
 
 let cachedFlaggedGroups = null;
 
+// ---------------- CONTEXT MENU (COPY ID) ----------------
+let currentContextMenuIdToCopy = null;
+
+chrome.runtime.onInstalled.addListener(() => {
+    chrome.contextMenus.create({
+        id: "scout-copy-id",
+        title: "Copy ID",
+        contexts: ["all"],
+        documentUrlPatterns: ["*://*.roblox.com/*"],
+        visible: false
+    });
+});
+
+chrome.contextMenus.onClicked.addListener((info, tab) => {
+    if (info.menuItemId === "scout-copy-id" && currentContextMenuIdToCopy) {
+        chrome.tabs.sendMessage(tab.id, { action: "copyToClipboard", text: currentContextMenuIdToCopy });
+    }
+});
+
 // ---------------- UPDATE CHECKER ----------------
 async function checkForUpdates() {
     const data = await chrome.storage.local.get(['lastUpdateCheck']);
@@ -69,6 +88,21 @@ async function getFlaggedGroups() {
 
 // ---------------- LOCAL SCANNER ----------------
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+    if (request.action === "updateContextMenu") {
+        currentContextMenuIdToCopy = request.idToCopy;
+        chrome.contextMenus.update("scout-copy-id", {
+            title: `Copy ${request.type.charAt(0).toUpperCase() + request.type.slice(1)} ID`,
+            visible: true
+        });
+        sendResponse({ success: true });
+        return true;
+    }
+    if (request.action === "hideContextMenu") {
+        currentContextMenuIdToCopy = null;
+        chrome.contextMenus.update("scout-copy-id", { visible: false });
+        sendResponse({ success: true });
+        return true;
+    }
     if (request.action === "checkUser") {
         handleCheckUser(request.userId).then(sendResponse);
         return true; 
@@ -125,6 +159,7 @@ async function handleCheckUser(userId) {
         return { error: err.message };
     }
 }
+
 // ---------------- TERMINATED FRIENDS SCANNER ----------------
 async function handleTerminatedFriends(userId) {
     try {
@@ -161,6 +196,7 @@ async function handleTerminatedFriends(userId) {
         return { error: err.message };
     }
 }
+
 // ---------------- GROUP PAGE SCANNER ----------------
 async function handleCheckGroup(groupId) {
     try {
@@ -171,6 +207,7 @@ async function handleCheckGroup(groupId) {
         return { error: err.message };
     }
 }
+
 // ---------------- DATABASE CHECKER ----------------
 async function handleCheckDatabase(userId) {
     try {

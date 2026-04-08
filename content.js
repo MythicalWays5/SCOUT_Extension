@@ -10,6 +10,45 @@ let settings = {
     groupBadgeEnabled: true, 
     autoPopupEnabled: true 
 };
+
+// ---------------- CONTEXT MENU ID EXTRACTOR ----------------
+document.addEventListener("mousedown", (e) => {
+    if (e.button !== 2) return; 
+
+    let idToCopy = null;
+    let type = null;
+    const link = e.target.closest('a');
+    if (link && link.href) {
+        const matchUser = link.href.match(/\/users\/(\d+)/);
+        const matchGroup = link.href.match(/\/(?:groups|communities)\/(\d+)/);
+        const matchGame = link.href.match(/\/games\/(\d+)/);
+        const matchAsset = link.href.match(/\/(?:catalog|library|bundles)\/(\d+)/);
+
+        if (matchUser) { type = 'user'; idToCopy = matchUser[1]; }
+        else if (matchGroup) { type = 'group'; idToCopy = matchGroup[1]; }
+        else if (matchGame) { type = 'game'; idToCopy = matchGame[1]; }
+        else if (matchAsset) { type = 'asset'; idToCopy = matchAsset[1]; }
+    }
+    if (!idToCopy) {
+        const path = window.location.href;
+        const matchUser = path.match(/\/users\/(\d+)/);
+        const matchGroup = path.match(/\/(?:groups|communities)\/(\d+)/);
+        const matchGame = path.match(/\/games\/(\d+)/);
+        const matchAsset = path.match(/\/(?:catalog|library|bundles)\/(\d+)/);
+
+        if (matchUser) { type = 'user'; idToCopy = matchUser[1]; }
+        else if (matchGroup) { type = 'group'; idToCopy = matchGroup[1]; }
+        else if (matchGame) { type = 'game'; idToCopy = matchGame[1]; }
+        else if (matchAsset) { type = 'asset'; idToCopy = matchAsset[1]; }
+    }
+    if (idToCopy && type) {
+        chrome.runtime.sendMessage({ action: "updateContextMenu", type: type, idToCopy: idToCopy });
+    } else {
+        chrome.runtime.sendMessage({ action: "hideContextMenu" });
+    }
+});
+
+// --- READ SETTINGS AND CHECK FOR UPDATES ---
 chrome.storage.local.get([
     'mainBadgeEnabled', 
     'listBadgeEnabled', 
@@ -210,6 +249,7 @@ async function fetchGroupData(groupId) {
     apiCache.set(cacheKey, fetchPromise);
     return fetchPromise;
 }
+
 async function showScoutIntelligenceModal(userId, status, risk) {
     if (document.getElementById('scout-intel-modal')) return;
 
@@ -560,7 +600,6 @@ function processCommunitySearch() {
 function processListLinks() {
     if (!settings.listBadgeEnabled) return;
     if (!location.pathname.match(/\/(friends|followers|followings?)/)) return;
-    
     document.querySelectorAll('.scout-db-warning-wrapper').forEach(badge => {
         if (badge.parentElement && badge.parentElement.closest('.avatar-card-content, .friend-item')) {
             const prev = badge.previousElementSibling;
@@ -579,7 +618,6 @@ function processListLinks() {
         const userId = match[1];
 
         if (userId === getUserIdFromUrl()) return;
-        
         if (link.dataset.scoutUserId !== userId) {
             const nextEl = link.nextElementSibling;
             if (nextEl && nextEl.classList.contains("scout-db-warning-wrapper")) {
@@ -588,7 +626,6 @@ function processListLinks() {
             link.removeAttribute("data-scout-warning-processed");
             link.dataset.scoutUserId = userId;
         }
-        
         if (!link.dataset.scoutWarningProcessed) {
             link.dataset.scoutWarningProcessed = "true";
             
@@ -615,7 +652,6 @@ function processListLinks() {
                 }
             }
         }
-        
         if (processedListUsers.has(userId)) return;
         processedListUsers.add(userId); 
 
@@ -687,4 +723,32 @@ setInterval(() => {
     processGroupPage(); 
     processCommunitySearch();
     processListLinks();
-}, 2000);
+}, 2000); 
+
+setTimeout(() => {
+    processMainProfile();
+    processGroupPage(); 
+    processCommunitySearch();
+    processListLinks();
+}, 500);
+
+// ---------------- CLIPBOARD LISTENER ----------------
+chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+    if (request.action === "copyToClipboard") {
+        const textArea = document.createElement("textarea");
+        textArea.value = request.text;
+        textArea.style.position = "fixed";
+        textArea.style.left = "-999999px";
+        document.body.appendChild(textArea);
+        textArea.focus();
+        textArea.select();
+        try {
+            document.execCommand('copy');
+            console.log(`SCOUT: Copied ${request.text} to clipboard!`);
+        } catch (err) {
+            console.error('SCOUT: Failed to copy ID', err);
+        }
+        document.body.removeChild(textArea);
+        sendResponse({ success: true });
+    }
+});
