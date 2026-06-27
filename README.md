@@ -24,7 +24,6 @@ Made by the community, for the community. Stay safe.
 ## 🛠️ Technical Upgrades (v1.55.0)
 * **API Scaling:** Switched to the `/friends/find` paginated endpoint to support up to 1,000 friends, ensuring deep network transparency.
 * **Circuit Breaker & Fallback:** Integrated a robust retry-with-backoff system and a secondary Render-hosted fallback node to bypass Cloudflare rate limits during heavy network scans.
-* **UI/UX Refinement:** Implemented a document-body-level tooltip system for friend-list warnings to ensure icons and labels are never clipped by container boundaries.
 
 ---
 
