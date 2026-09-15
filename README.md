@@ -1,4 +1,4 @@
-# 🛡️ S.C.O.U.T. Roblox (v1.55.0)
+# 🛡️ S.C.O.U.T. Roblox (v1.56.0)
 
 **S.C.O.U.T. Roblox** is a lightweight, community-driven browser extension designed to keep Roblox players safe. It automatically scans profiles, friend networks, and community groups to detect associations with known NSFW/ERP (Erotic Roleplay) networks. 
 
@@ -8,9 +8,10 @@ Made by the community, for the community. Stay safe.
 
 ---
 
-## ✨ New in v1.55.0
-* **Bulk Network Scanning:** S.C.O.U.T. now supports scanning up to 1,000 friends via the modern paginated Roblox API. A new progress bar tracks the scan status in real-time.
-* **Proactive Group Alerts:** Flagged groups are now highlighted directly on the profile page with an interactive warning badge, allowing you to identify threats without clicking into the group page.
+## ✨ New in v1.56.0
+* **Dedicated Scam Detection:** Added a new threat vector (`SCAM`) to identify accounts involved in phishing and cookie-logging (e.g., fake 3D avatar art commissions). Scammers are marked with a distinct yellow warning badge to differentiate them from NSFW threats.
+* **Smart Profile Badges:** The main profile safety badge now prioritizes database intelligence. If a user has 0 flagged groups but was caught by the Autonomous System or manually logged, the badge will accurately display "DATABASE FLAGGED" or "FLAGGED SCAM" instead of "SAFE".
+* **Community Guidelines Disclaimer:** Introduced a one-time Terms & Conditions popup upon first use to clarify the extension's purpose, acknowledge the possibility of false flags, and enforce a strict anti-harassment policy.
 
 ## ✨ Core Features
 * **Main Profile Scanning:** Safety rating badges displayed directly on profile headers.
@@ -21,7 +22,7 @@ Made by the community, for the community. Stay safe.
 
 ---
 
-## 🛠️ Technical Upgrades (v1.55.0)
+## 🛠️ Technical Upgrades (v1.55.0 - v1.56.0)
 * **API Scaling:** Switched to the `/friends/find` paginated endpoint to support up to 1,000 friends, ensuring deep network transparency.
 * **Circuit Breaker & Fallback:** Integrated a robust retry-with-backoff system and a secondary Render-hosted fallback node to bypass Cloudflare rate limits during heavy network scans.
 
