@@ -213,3 +213,18 @@
     margin: 0 !important;
     cursor: pointer;
 }
+/* --- SCAM FLAG OVERRIDES --- */
+.scout-scam-warning {
+  background-color: #f1c40f !important;
+  color: black !important; 
+}
+
+/* Tooltip Arrow */
+.scout-scam-warning::before {
+  border-color: #f1c40f transparent transparent transparent !important;
+}
+
+/* Tooltip Border */
+.scout-scam-warning::after {
+  border-color: #f1c40f !important;
+}
