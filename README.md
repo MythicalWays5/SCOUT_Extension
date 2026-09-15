@@ -1,3 +1,7 @@
+---
+# The repository responsible for continued updates to this extension has been updated to: https://github.com/The-Sapphire-Order/SCOUT-Extension-Chrome
+> This repository will not receive any more updates. The extension should comfortably handle the migration.
+---
 # 🛡️ S.C.O.U.T. Roblox (v1.56.0)
 
 **S.C.O.U.T. Roblox** is a lightweight, community-driven browser extension designed to keep Roblox players safe. It automatically scans profiles, friend networks, and community groups to detect associations with known NSFW/ERP (Erotic Roleplay) networks. 
