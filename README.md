@@ -1,4 +1,3 @@
----
 # The repository responsible for continued updates to this extension has been updated to: https://github.com/The-Sapphire-Order/SCOUT-Extension-Chrome
 > This repository will not receive any more updates. The extension should comfortably handle the migration.
 ---
