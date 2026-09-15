@@ -57,7 +57,8 @@ chrome.storage.local.get([
     'groupBadgeEnabled', 
     'autoPopupEnabled',
     'autoGroupPopupEnabled', 
-    'updateAvailable'
+    'updateAvailable',
+    'scoutTcAccepted'
 ], (result) => {
     if (result.mainBadgeEnabled !== undefined) settings.mainBadgeEnabled = result.mainBadgeEnabled;
     if (result.listBadgeEnabled !== undefined) settings.listBadgeEnabled = result.listBadgeEnabled;
@@ -65,6 +66,9 @@ chrome.storage.local.get([
     if (result.groupBadgeEnabled !== undefined) settings.groupBadgeEnabled = result.groupBadgeEnabled;
     if (result.autoGroupPopupEnabled !== undefined) settings.autoGroupPopupEnabled = result.autoGroupPopupEnabled;
     if (result.autoPopupEnabled !== undefined) settings.autoPopupEnabled = result.autoPopupEnabled;
+    if (!result.scoutTcAccepted) {
+        showTermsAndConditions();
+    }
     
     if (result.updateAvailable) showInPageUpdateBanner();
     setTimeout(() => {
@@ -144,13 +148,52 @@ function showInPageUpdateBanner() {
     document.body.appendChild(banner);
 
     document.getElementById('scout-update-download').addEventListener('click', () => {
-        window.open("https://github.com/MythicalWays5/SCOUT_Extension", "_blank");
-        window.location.href = "https://github.com/MythicalWays5/SCOUT_Extension/archive/refs/heads/main.zip";
+        window.open("https://github.com/The-Sapphire-Order/SCOUT-Extension-Chrome", "_blank");
+        window.location.href = "https://github.com/The-Sapphire-Order/SCOUT-Extension-Chrome/archive/refs/heads/main.zip";
         banner.remove(); 
     });
 
     document.getElementById('scout-update-dismiss').addEventListener('click', () => {
         banner.remove();
+    });
+}
+
+// ---------------- TERMS AND CONDITIONS MODAL ----------------
+function showTermsAndConditions() {
+    if (document.getElementById('scout-tnc-modal')) return;
+
+    const overlay = document.createElement("div");
+    overlay.id = "scout-tnc-modal";
+    overlay.className = "scout-modal-overlay scout-visible"; 
+    overlay.style.zIndex = "99999999";
+
+    overlay.innerHTML = `
+        <div class="scout-modal-box" onclick="event.stopPropagation()">
+            <div class="scout-modal-header">
+                <img src="${chrome.runtime.getURL('scout_logo.png')}" style="width: 24px; height: 24px;">
+                <h3 class="scout-modal-title" style="color: #f39c12;">S.C.O.U.T. Disclaimer</h3>
+            </div>
+            <div class="scout-modal-section">
+                <div class="scout-modal-desc" style="color: #d0d0dc; font-size: 13px; line-height: 1.6;">
+                    By using S.C.O.U.T., you agree to the following terms:
+                    <ul style="margin-top: 8px; padding-left: 20px; color: #f0f0f5; text-align: left;">
+                        <li>The S.C.O.U.T. database is strictly for reference purposes. It should not be a pure decision-making factor for moderation communities.</li>
+                        <li>There is a small possibility of false flags, and it may not be 100% accurate.</li>
+                        <li>You agree to not harass or target any user by weaponizing this system.</li>
+                        <li>You agree to strictly follow Roblox ToS and Community Standards.</li>
+                    </ul>
+                </div>
+            </div>
+            <button class="scout-modal-close" id="scout-tnc-accept-btn" style="background: #2ecc71;">I Accept & Understand</button>
+        </div>
+    `;
+    document.body.appendChild(overlay);
+
+    document.getElementById('scout-tnc-accept-btn').addEventListener('click', () => {
+        chrome.storage.local.set({ scoutTcAccepted: true }, () => {
+            overlay.classList.remove("scout-visible");
+            setTimeout(() => overlay.remove(), 200);
+        });
     });
 }
 
@@ -325,14 +368,16 @@ async function showScoutIntelligenceModal(userId, status, risk, created_at) {
         "SHADOW_SCAN": "<b>This user very likely is or was a part of the inappropriate/NSFW Roblox account network.</b><br>Flagged instantly by SCOUT's automated security grid. This detection is highly reliable, calculated using a strict mathematical formula that analyzes the user's active networks and group intersections.<br><b>Exercise extreme caution around this profile.</b>",
         "PULSE_CRAWL": "<b>This user very likely is or was a part of the inappropriate/NSFW Roblox account network.</b><br>Flagged by SCOUT's background pulse scans. This is a highly accurate detection driven by a mathematical risk formula that constantly monitors and cross-references known dangerous networks.<br><b>Exercise extreme caution around this profile.</b>",
         "DEEP_CRAWL": "<b>This user very likely is or was a part of the inappropriate/NSFW Roblox account network.</b><br>Flagged by SCOUT's heavy Deep Crawler. This system mathematically spider-webs through the connections of known threats to uncover hidden networks, making this a highly reliable detection.<br><b>Exercise extreme caution around this profile.</b>",
-        "MANUAL": "Manually investigated and flagged by a S.C.O.U.T. Administrator using verified evidence.<br><b>Exercise extreme caution around this profile.</b>"
+        "MANUAL": "Manually investigated and flagged by a S.C.O.U.T. Administrator using verified evidence.<br><b>Exercise extreme caution around this profile.</b>",
+        "SCAM": "Manually investigated and flagged by a S.C.O.U.T. Administrator for involvement in scam networks (e.g., account theft, Robux scams, off-platform phishing).<br><b>Exercise extreme caution around this profile.</b>"
     };
 
     const riskDefs = {
         "CLOTHING": "User was involved with creating inappropriate fetish/kink clothing.",
         "ACTIVITY": "User was witnessed involving themselves fully with inappropriate networks and conduct.",
         "BIO": "User was found having an extremely inappropriate description, linking themselves to inappropriate networks.",
-        "ASSETS": "User was found to be the owner/creator of inappropriate/NSFW assets on Roblox (audio, meshes, images, etc)."
+        "ASSETS": "User was found to be the owner/creator of inappropriate/NSFW assets on Roblox (audio, meshes, images, etc).",
+        "SCAM": "User was manually flagged for involvement in scam networks (e.g., account theft, Robux scams, off-platform phishing)."
     };
 
     const displayStatus = status || "UNKNOWN";
@@ -406,9 +451,9 @@ async function showScoutIntelligenceModal(userId, status, risk, created_at) {
     overlay.addEventListener("click", closeModal);
 }
 
-// ---------------- MAIN PROFILE HEADER ----------------
-function createMainProfileBadge(data) {
-    const count = data.flaggedGroupCount || 0;
+// ---------------- MAIN PROFILE BADGE ----------------
+function createMainProfileBadge(data, dbData) {
+    const count = data ? (data.flaggedGroupCount || 0) : 0;
     const badge = document.createElement("span");
     badge.className = "scout-badge scout-dynamic-badge";
     
@@ -418,14 +463,22 @@ function createMainProfileBadge(data) {
     badge.appendChild(logo);
 
     const textSpan = document.createElement("span");
-
-    if (count >= 10 || data.risk === "high") {
+    if (dbData && dbData.isFlagged) {
+        if (dbData.risk === "SCAM") {
+            badge.classList.add("scout-scam-warning");
+            textSpan.textContent = `FLAGGED SCAM (${count})`;
+        } else {
+            badge.classList.add("scout-high");
+            textSpan.textContent = `DATABASE FLAGGED (${count})`;
+        }
+    } 
+    else if (count >= 10 || (data && data.risk === "high")) {
         badge.classList.add("scout-high");
         textSpan.textContent = `HIGH RISK (${count})`;
-    } else if (count >= 5 || data.risk === "medium") {
+    } else if (count >= 5 || (data && data.risk === "medium")) {
         badge.classList.add("scout-medium");
         textSpan.textContent = `MODERATE RISK (${count})`;
-    } else if (count > 0 || data.risk === "low") {
+    } else if (count > 0 || (data && data.risk === "low")) {
         badge.classList.add("scout-low");
         textSpan.textContent = `SUSPICIOUS (${count})`;
     } else {
@@ -460,7 +513,7 @@ async function processMainProfile() {
     if (!document.body.contains(usernameEl)) return;
     let finalBadgeNode = usernameEl; 
     if (settings.mainBadgeEnabled && data && !usernameEl.nextElementSibling?.classList.contains("scout-dynamic-badge")) {
-        const badge = createMainProfileBadge(data);
+        const badge = createMainProfileBadge(data, dbData);
         usernameEl.insertAdjacentElement("afterend", badge);
         finalBadgeNode = badge;
 
@@ -474,6 +527,7 @@ async function processMainProfile() {
         if (parentContainer && !parentContainer.querySelector(".scout-db-warning-wrapper")) {
             const warningIcon = document.createElement("span");
             warningIcon.className = "scout-db-warning-wrapper";
+            if (dbData.risk === "SCAM") warningIcon.classList.add("scout-scam-warning");
             warningIcon.textContent = "!";
             warningIcon.setAttribute("data-tooltip", "This user has been flagged dangerous by the SCOUT Autonomous System. Click for details.");
             
@@ -744,6 +798,7 @@ async function processFriendTiles() {
         
         const warning = document.createElement("div");
         warning.className = "scout-db-warning-wrapper scout-friend-tile-warning";
+        if (dbData.risk === "SCAM") warning.classList.add("scout-scam-warning");
         warning.textContent = "!";
         
         // --- GLOBAL TOOLTIP TELEPORT LOGIC ---
@@ -977,6 +1032,7 @@ function processListLinks() {
                     if (!link.nextElementSibling || !link.nextElementSibling.classList.contains("scout-db-warning-wrapper")) {
                         const warningIcon = document.createElement("span");
                         warningIcon.className = "scout-db-warning-wrapper";
+                        if (dbData.risk === "SCAM") warningIcon.classList.add("scout-scam-warning");
                         warningIcon.textContent = "!";
                         warningIcon.setAttribute("data-tooltip", "This user has been flagged dangerous by the SCOUT Autonomous System. Click for details.");
                         
